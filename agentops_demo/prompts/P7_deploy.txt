@@ -1,0 +1,13 @@
+=== STEP 7: Deploy the agent (eval-gated) ===
+Paste into CoCo:
+
+Deploy AGENTOPS_DB.TELCO.TELCO_REVENUE_AGENT using an eval gate:
+1. Read the latest AGENT row in AGENTOPS_DB.TELCO.EVAL_SCOREBOARD. Only continue if answer correctness >= 0.85
+   and refusal_correctness = 1. Otherwise stop and tell me what failed.
+2. If the LIVE version has uncommitted changes, COMMIT it with a comment containing the eval run id.
+3. Point alias PRODUCTION at the new version and set DEFAULT_VERSION to it. Keep the previous
+   version available under alias PREVIOUS so rollback is one statement.
+4. Grant USAGE on the agent to role AGENTOPS_CONSUMER_ROLE and make it available in Snowflake Intelligence.
+5. Insert a row into AGENTOPS_DB.TELCO.OPS_DEPLOYMENT_LOG (see ops/08_versioning_rollback.sql) with
+   the version, alias, eval run id, score and deployer.
+6. Smoke test: switch to AGENTOPS_CONSUMER_ROLE and ask the PRODUCTION alias "What was net revenue last month?"

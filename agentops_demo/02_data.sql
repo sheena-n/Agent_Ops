@@ -1,0 +1,184 @@
+-- =====================================================================
+-- AgentOps Demo | 02 - Synthetic telecom data
+-- Deliberate "traps" (cryptic names, codes, gross vs net) make the
+-- baseline semantic view score poorly so improvements are measurable.
+-- =====================================================================
+USE ROLE AGENTOPS_DEMO_ROLE;
+USE WAREHOUSE AGENTOPS_WH;
+USE SCHEMA AGENTOPS_DB.TELCO;
+
+-- ---------- PLANS ----------
+CREATE OR REPLACE TABLE PLANS (
+  PLAN_ID      NUMBER PRIMARY KEY,
+  PLAN_NM      VARCHAR,          -- plan name
+  PLAN_TYP_CD  VARCHAR,          -- PRE=Prepaid, POST=Postpaid, 5GU=5G Unlimited, FBR=Fiber home internet
+  MO_FEE       NUMBER(10,2),     -- list monthly recurring fee (USD)
+  DATA_CAP_GB  NUMBER            -- NULL = unlimited
+);
+INSERT INTO PLANS VALUES
+ (1,'Prepaid Basic','PRE',25,5),(2,'Prepaid Plus','PRE',40,15),
+ (3,'Postpaid Essential','POST',55,30),(4,'Postpaid Premium','POST',75,60),
+ (5,'5G Unlimited','5GU',90,NULL),(6,'5G Unlimited Max','5GU',110,NULL),
+ (7,'Fiber 500','FBR',65,NULL),(8,'Fiber Gig','FBR',85,NULL),
+ (9,'Business Mobile','POST',70,50),(10,'Business 5G Fleet','5GU',120,NULL);
+
+-- ---------- CUSTOMERS ----------
+CREATE OR REPLACE TABLE CUSTOMERS (
+  CUST_ID     NUMBER PRIMARY KEY,
+  CUST_NM     VARCHAR,
+  SEG_CD      VARCHAR,   -- C=Consumer, S=SMB, E=Enterprise
+  RGN_CD      VARCHAR,   -- NE, SE, MW, SW, W
+  STATE       VARCHAR,
+  SIGNUP_DT   DATE,
+  STS_CD      VARCHAR    -- A=Active, S=Suspended, X=Churned/Closed
+);
+INSERT INTO CUSTOMERS
+SELECT
+  SEQ4()+1,
+  'Customer_' || LPAD(SEQ4()+1, 6, '0'),
+  CASE WHEN UNIFORM(1,100,RANDOM()) <= 80 THEN 'C' WHEN UNIFORM(1,100,RANDOM()) <= 75 THEN 'S' ELSE 'E' END,
+  DECODE(UNIFORM(1,5,RANDOM()),1,'NE',2,'SE',3,'MW',4,'SW','W'),
+  NULL,
+  DATEADD(day, -UNIFORM(30, 1800, RANDOM()), '2026-10-31'::DATE),
+  CASE WHEN UNIFORM(1,100,RANDOM()) <= 82 THEN 'A' WHEN UNIFORM(1,100,RANDOM()) <= 30 THEN 'S' ELSE 'X' END
+FROM TABLE(GENERATOR(ROWCOUNT => 50000));
+
+UPDATE CUSTOMERS SET STATE = CASE RGN_CD
+  WHEN 'NE' THEN DECODE(MOD(CUST_ID,3),0,'NY',1,'MA','NJ')
+  WHEN 'SE' THEN DECODE(MOD(CUST_ID,3),0,'FL',1,'GA','NC')
+  WHEN 'MW' THEN DECODE(MOD(CUST_ID,3),0,'IL',1,'OH','MI')
+  WHEN 'SW' THEN DECODE(MOD(CUST_ID,3),0,'TX',1,'AZ','NM')
+  ELSE DECODE(MOD(CUST_ID,3),0,'CA',1,'WA','OR') END;
+
+-- ---------- SUBSCRIPTIONS ----------
+CREATE OR REPLACE TABLE SUBSCRIPTIONS (
+  SUB_ID     NUMBER PRIMARY KEY,
+  CUST_ID    NUMBER,
+  PLAN_ID    NUMBER,
+  START_DT   DATE,
+  END_DT     DATE,      -- NULL = still active
+  CHURN_FLG  BOOLEAN,   -- TRUE if the line ended by customer choice
+  CHURN_RSN  VARCHAR
+);
+INSERT INTO SUBSCRIPTIONS
+SELECT
+  ROW_NUMBER() OVER (ORDER BY c.CUST_ID, g.n),
+  c.CUST_ID,
+  CASE c.SEG_CD
+    WHEN 'C' THEN UNIFORM(1,8,RANDOM())
+    WHEN 'S' THEN DECODE(UNIFORM(1,4,RANDOM()),1,3,2,4,3,9,7)
+    ELSE DECODE(UNIFORM(1,3,RANDOM()),1,9,2,10,6) END,
+  c.SIGNUP_DT,
+  IFF(c.STS_CD='X', DATEADD(day, UNIFORM(60,700,RANDOM()), c.SIGNUP_DT), NULL),
+  c.STS_CD='X',
+  IFF(c.STS_CD='X', DECODE(UNIFORM(1,5,RANDOM()),1,'Price',2,'Network quality',3,'Competitor offer',4,'Moved','Customer service'), NULL)
+FROM CUSTOMERS c
+JOIN (SELECT SEQ4()+1 n FROM TABLE(GENERATOR(ROWCOUNT=>3))) g
+  ON g.n <= CASE c.SEG_CD WHEN 'C' THEN 1 WHEN 'S' THEN 2 ELSE 3 END;
+UPDATE SUBSCRIPTIONS SET END_DT = LEAST(END_DT, '2026-10-31'::DATE) WHERE END_DT IS NOT NULL;
+
+-- ---------- BILLING (monthly invoices, 24 months) ----------
+-- AMT_GROSS = recurring + overage + roaming ; AMT_NET = AMT_GROSS - DISC_AMT
+-- "Revenue" in finance = AMT_NET (trap: naive models sum AMT_GROSS)
+CREATE OR REPLACE TABLE BILLING (
+  INV_ID      NUMBER,
+  SUB_ID      NUMBER,
+  CUST_ID     NUMBER,
+  BILL_MO     DATE,          -- first day of billing month
+  RECUR_AMT   NUMBER(10,2),
+  OVG_AMT     NUMBER(10,2),  -- data overage
+  ROAM_AMT    NUMBER(10,2),
+  DISC_AMT    NUMBER(10,2),
+  AMT_GROSS   NUMBER(10,2),
+  AMT_NET     NUMBER(10,2),
+  PAY_STS     VARCHAR        -- P=Paid, L=Late, W=Written off
+);
+INSERT INTO BILLING
+WITH months AS (
+  SELECT DATEADD(month, SEQ4(), '2024-11-01'::DATE) BILL_MO FROM TABLE(GENERATOR(ROWCOUNT=>24))
+), base AS (
+  SELECT s.SUB_ID, s.CUST_ID, m.BILL_MO, p.MO_FEE, p.PLAN_TYP_CD,
+         UNIFORM(0,100,RANDOM()) r1, UNIFORM(0,100,RANDOM()) r2, UNIFORM(0,100,RANDOM()) r3
+  FROM SUBSCRIPTIONS s
+  JOIN PLANS p ON p.PLAN_ID = s.PLAN_ID
+  JOIN months m ON m.BILL_MO >= DATE_TRUNC(month, s.START_DT)
+              AND m.BILL_MO <= COALESCE(s.END_DT, '2026-10-31'::DATE)
+)
+SELECT ROW_NUMBER() OVER (ORDER BY BILL_MO, SUB_ID), SUB_ID, CUST_ID, BILL_MO,
+       MO_FEE,
+       IFF(PLAN_TYP_CD IN ('PRE','POST') AND r1 > 80, ROUND(r1/4,2), 0),
+       IFF(r2 > 93, ROUND(r2/3,2), 0),
+       IFF(r3 > 70, ROUND(MO_FEE*0.10,2), 0),
+       0, 0,
+       CASE WHEN r3 < 92 THEN 'P' WHEN r3 < 98 THEN 'L' ELSE 'W' END
+FROM base;
+UPDATE BILLING SET AMT_GROSS = RECUR_AMT + OVG_AMT + ROAM_AMT,
+                   AMT_NET   = RECUR_AMT + OVG_AMT + ROAM_AMT - DISC_AMT;
+
+-- ---------- USAGE_DAILY (last 90 days, sampled 20% of subs) ----------
+CREATE OR REPLACE TABLE USAGE_DAILY (
+  SUB_ID     NUMBER,
+  USG_DT     DATE,
+  DATA_GB    NUMBER(10,3),
+  VOICE_MIN  NUMBER,
+  SMS_CNT    NUMBER,
+  ROAM_FLG   BOOLEAN
+);
+INSERT INTO USAGE_DAILY
+SELECT s.SUB_ID, DATEADD(day, -d.n, '2026-10-31'::DATE),
+       ROUND(UNIFORM(0, 8000, RANDOM())/1000, 3),
+       UNIFORM(0, 180, RANDOM()), UNIFORM(0, 60, RANDOM()),
+       UNIFORM(1,100,RANDOM()) > 97
+FROM SUBSCRIPTIONS s
+JOIN (SELECT SEQ4() n FROM TABLE(GENERATOR(ROWCOUNT=>90))) d
+WHERE s.END_DT IS NULL AND MOD(s.SUB_ID, 5) = 0;
+
+-- ---------- NETWORK_EVENTS ----------
+CREATE OR REPLACE TABLE NETWORK_EVENTS (
+  EVT_ID      NUMBER,
+  RGN_CD      VARCHAR,
+  TOWER_ID    VARCHAR,
+  EVT_TS      TIMESTAMP_NTZ,
+  EVT_TYP     VARCHAR,     -- OUTAGE, DEGRADED, MAINTENANCE
+  DUR_MIN     NUMBER,
+  SUBS_IMPACTED NUMBER
+);
+INSERT INTO NETWORK_EVENTS
+SELECT SEQ4()+1,
+       DECODE(UNIFORM(1,6,RANDOM()),1,'NE',2,'SE',3,'MW',4,'SW','W'),   -- W over-weighted
+       'TWR-' || LPAD(UNIFORM(1,400,RANDOM()),4,'0'),
+       DATEADD(minute, -UNIFORM(0, 1051200, RANDOM()), '2026-10-31 23:59:00'::TIMESTAMP_NTZ),
+       DECODE(UNIFORM(1,4,RANDOM()),1,'OUTAGE',2,'DEGRADED',3,'DEGRADED','MAINTENANCE'),
+       UNIFORM(5, 600, RANDOM()),
+       UNIFORM(10, 5000, RANDOM())
+FROM TABLE(GENERATOR(ROWCOUNT => 3000));
+
+-- ---------- SUPPORT_TICKETS ----------
+CREATE OR REPLACE TABLE SUPPORT_TICKETS (
+  TKT_ID      NUMBER,
+  CUST_ID     NUMBER,
+  OPEN_TS     TIMESTAMP_NTZ,
+  CAT         VARCHAR,     -- BILLING, NETWORK, DEVICE, PLAN_CHANGE, CANCEL
+  RES_HRS     NUMBER(8,1),
+  CSAT        NUMBER       -- 1..5, NULL if survey not answered
+);
+INSERT INTO SUPPORT_TICKETS
+SELECT SEQ4()+1, UNIFORM(1,50000,RANDOM()),
+       DATEADD(minute, -UNIFORM(0, 1051200, RANDOM()), '2026-10-31 23:59:00'::TIMESTAMP_NTZ),
+       DECODE(UNIFORM(1,5,RANDOM()),1,'BILLING',2,'NETWORK',3,'DEVICE',4,'PLAN_CHANGE','CANCEL'),
+       ROUND(UNIFORM(1, 960, RANDOM())/10, 1),
+       IFF(UNIFORM(1,100,RANDOM()) > 35, UNIFORM(1,5,RANDOM()), NULL)
+FROM TABLE(GENERATOR(ROWCOUNT => 40000));
+
+-- ---------- REGIONS (lookup; links customers and network events) ----------
+CREATE OR REPLACE TABLE REGIONS (RGN_CD VARCHAR PRIMARY KEY, RGN_NM VARCHAR);
+INSERT INTO REGIONS VALUES ('NE','Northeast'),('SE','Southeast'),('MW','Midwest'),('SW','Southwest'),('W','West');
+
+-- ---------- Sanity checks ----------
+SELECT 'PLANS' t, COUNT(*) FROM PLANS UNION ALL
+SELECT 'CUSTOMERS', COUNT(*) FROM CUSTOMERS UNION ALL
+SELECT 'SUBSCRIPTIONS', COUNT(*) FROM SUBSCRIPTIONS UNION ALL
+SELECT 'BILLING', COUNT(*) FROM BILLING UNION ALL
+SELECT 'USAGE_DAILY', COUNT(*) FROM USAGE_DAILY UNION ALL
+SELECT 'NETWORK_EVENTS', COUNT(*) FROM NETWORK_EVENTS UNION ALL
+SELECT 'SUPPORT_TICKETS', COUNT(*) FROM SUPPORT_TICKETS;

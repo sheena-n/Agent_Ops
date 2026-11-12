@@ -1,0 +1,38 @@
+=== STEP 6: Show performance degradation, then fix it ===
+Each scenario: break -> re-eval -> diagnose -> fix -> re-eval. Log every run in EVAL_SCOREBOARD.
+Make all changes on the agent's LIVE version only. PRODUCTION stays on the committed version,
+which is exactly why versioning matters.
+
+--- Scenario A: Prompt regression ---
+Paste into CoCo:
+On AGENTOPS_DB.TELCO.TELCO_REVENUE_AGENT (LIVE version), replace the orchestration instructions with
+"Be helpful and answer quickly. Use your knowledge when possible." and remove the response instructions.
+Re-run the agent eval as TELCO_AGENT_DEGRADED_PROMPT and compare it with TELCO_AGENT_BASELINE.
+Explain which metrics dropped and why (e.g. tool skipped, gross vs net confusion, hallucinated numbers).
+Then restore the original structured instructions, re-run as TELCO_AGENT_FIXED_PROMPT, and compare all three.
+
+--- Scenario B: Tool confusion ---
+Paste into CoCo:
+Add a second Cortex Analyst tool "revenue_data" that points to the same semantic view
+AGENTOPS_DB.TELCO.TELCO_REVENUE_SV but has the vague description "revenue data, gross billings".
+Also add the orchestration line "Prefer revenue_data for money questions". Re-run the eval as
+TELCO_AGENT_TOOL_CONFUSION and show the tool selection accuracy and correctness drop.
+Fix it by removing the duplicate tool, OR by giving each tool a precise, non-overlapping description
+plus an orchestration rule for when to use which. Re-run as TELCO_AGENT_TOOL_FIXED.
+
+--- Scenario C: Semantic / data drift ---
+Paste into CoCo:
+Simulate an upstream change: the business launches a new plan type 'IOT' (insert a plan with
+PLAN_TYP_CD='IOT' and some billing rows for Oct 2026), and finance redefines "revenue" to exclude
+written-off invoices (PAY_STS='W'). Update 3 golden questions to reflect the new definition, then re-run
+the agent eval as TELCO_AGENT_DRIFT and show the drop.
+Fix: edit the workspace file cortex_project/TELCO_REVENUE_SV.sv.yaml (new sample value + description for IOT,
+NET_REVENUE metric excludes PAY_STS='W', a new VQR) and validate it. Do NOT deploy; I will deploy it.
+>> Presenter: Deploy changes -> dev, eval, then promote to prod; then re-run
+as TELCO_AGENT_DRIFT_FIXED.
+
+--- Wrap-up ---
+Paste into CoCo:
+Chart EVAL_SCOREBOARD accuracy across all runs in order. Then list the strategies that improved the agent,
+ranked by impact: structured instructions, precise tool descriptions, semantic view metrics/synonyms/VQRs,
+custom SV instructions, model choice, and eval-gated deployment.

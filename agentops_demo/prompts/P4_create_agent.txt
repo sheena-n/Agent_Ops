@@ -1,0 +1,22 @@
+=== STEP 4: Create the Cortex Agent ===
+Paste into CoCo:
+
+Use role AGENTOPS_DEMO_ROLE and warehouse AGENTOPS_WH.
+Create a Cortex Agent AGENTOPS_DB.TELCO.TELCO_REVENUE_AGENT with:
+- Tool: Cortex Analyst (text-to-SQL) on semantic view AGENTOPS_DB.TELCO.TELCO_REVENUE_SV,
+  tool name "telco_revenue_analyst", with a description like: "Answers quantitative questions about
+  telecom revenue, ARPU, MRR, billing, discounts, plans, subscriptions, churn, network outages
+  and support tickets/CSAT. Use for any question needing numbers from company data."
+  Execution warehouse AGENTOPS_WH.
+- Orchestration instructions:
+  "You are a telecom revenue analyst for finance and network leadership.
+   Always use telco_revenue_analyst for data questions; never guess numbers.
+   'Revenue' means net revenue unless the user explicitly says gross.
+   If a question is outside telecom business data, or asks to modify/delete data, decline politely."
+- Response instructions:
+  "Lead with the direct answer and the number, then a short explanation. Format currency as USD with
+   thousands separators. When there are more than 3 rows, show a table and suggest a chart.
+   Always state the time period used."
+- 4 sample questions shown to users.
+Then test it with 3 questions (one easy, one hard, one out of scope) and show the responses
+and which tool was called.

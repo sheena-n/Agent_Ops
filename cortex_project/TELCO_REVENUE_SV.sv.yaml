@@ -1,0 +1,271 @@
+name: TELCO_REVENUE_SV
+tables:
+  - name: BILLING
+    base_table:
+      database: AGENTOPS_DB
+      schema: TELCO
+      table: BILLING
+    primary_key:
+      columns:
+        - INV_ID
+    dimensions:
+      - name: CUST_ID
+        expr: CUST_ID
+        data_type: "NUMBER(38,0)"
+        access_modifier: public_access
+      - name: INV_ID
+        expr: INV_ID
+        data_type: "NUMBER(38,0)"
+        access_modifier: public_access
+      - name: PAY_STS
+        expr: PAY_STS
+        data_type: VARCHAR(16777216)
+        access_modifier: public_access
+      - name: SUB_ID
+        expr: SUB_ID
+        data_type: "NUMBER(38,0)"
+        access_modifier: public_access
+    facts:
+      - name: AMT_GROSS
+        expr: AMT_GROSS
+        data_type: "NUMBER(10,2)"
+        access_modifier: public_access
+      - name: AMT_NET
+        expr: AMT_NET
+        data_type: "NUMBER(10,2)"
+        access_modifier: public_access
+      - name: DISC_AMT
+        expr: DISC_AMT
+        data_type: "NUMBER(10,2)"
+        access_modifier: public_access
+      - name: OVG_AMT
+        expr: OVG_AMT
+        data_type: "NUMBER(10,2)"
+        access_modifier: public_access
+      - name: RECUR_AMT
+        expr: RECUR_AMT
+        data_type: "NUMBER(10,2)"
+        access_modifier: public_access
+      - name: ROAM_AMT
+        expr: ROAM_AMT
+        data_type: "NUMBER(10,2)"
+        access_modifier: public_access
+    time_dimensions:
+      - name: BILL_MO
+        expr: BILL_MO
+        data_type: DATE
+        access_modifier: public_access
+  - name: CUSTOMERS
+    base_table:
+      database: AGENTOPS_DB
+      schema: TELCO
+      table: CUSTOMERS
+    primary_key:
+      columns:
+        - CUST_ID
+    dimensions:
+      - name: CUST_ID
+        expr: CUST_ID
+        data_type: "NUMBER(38,0)"
+        access_modifier: public_access
+      - name: CUST_NM
+        expr: CUST_NM
+        data_type: VARCHAR(16777216)
+        access_modifier: public_access
+      - name: RGN_CD
+        expr: RGN_CD
+        data_type: VARCHAR(16777216)
+        access_modifier: public_access
+      - name: SEG_CD
+        expr: SEG_CD
+        data_type: VARCHAR(16777216)
+        access_modifier: public_access
+      - name: STATE
+        expr: STATE
+        data_type: VARCHAR(16777216)
+        access_modifier: public_access
+      - name: STS_CD
+        expr: STS_CD
+        data_type: VARCHAR(16777216)
+        access_modifier: public_access
+    time_dimensions:
+      - name: SIGNUP_DT
+        expr: SIGNUP_DT
+        data_type: DATE
+        access_modifier: public_access
+  - name: NETWORK_EVENTS
+    base_table:
+      database: AGENTOPS_DB
+      schema: TELCO
+      table: NETWORK_EVENTS
+    primary_key:
+      columns:
+        - EVT_ID
+    dimensions:
+      - name: EVT_ID
+        expr: EVT_ID
+        data_type: "NUMBER(38,0)"
+        access_modifier: public_access
+      - name: EVT_TYP
+        expr: EVT_TYP
+        data_type: VARCHAR(16777216)
+        access_modifier: public_access
+      - name: RGN_CD
+        expr: RGN_CD
+        data_type: VARCHAR(16777216)
+        access_modifier: public_access
+      - name: TOWER_ID
+        expr: TOWER_ID
+        data_type: VARCHAR(16777216)
+        access_modifier: public_access
+    facts:
+      - name: DUR_MIN
+        expr: DUR_MIN
+        data_type: "NUMBER(38,0)"
+        access_modifier: public_access
+      - name: SUBS_IMPACTED
+        expr: SUBS_IMPACTED
+        data_type: "NUMBER(38,0)"
+        access_modifier: public_access
+    time_dimensions:
+      - name: EVT_TS
+        expr: EVT_TS
+        data_type: TIMESTAMP_NTZ(9)
+        access_modifier: public_access
+  - name: PLANS
+    base_table:
+      database: AGENTOPS_DB
+      schema: TELCO
+      table: PLANS
+    primary_key:
+      columns:
+        - PLAN_ID
+    dimensions:
+      - name: PLAN_ID
+        expr: PLAN_ID
+        data_type: "NUMBER(38,0)"
+        access_modifier: public_access
+      - name: PLAN_NM
+        expr: PLAN_NM
+        data_type: VARCHAR(16777216)
+        access_modifier: public_access
+      - name: PLAN_TYP_CD
+        expr: PLAN_TYP_CD
+        data_type: VARCHAR(16777216)
+        access_modifier: public_access
+    facts:
+      - name: DATA_CAP_GB
+        expr: DATA_CAP_GB
+        data_type: "NUMBER(38,0)"
+        access_modifier: public_access
+      - name: MO_FEE
+        expr: MO_FEE
+        data_type: "NUMBER(10,2)"
+        access_modifier: public_access
+  - name: SUBSCRIPTIONS
+    base_table:
+      database: AGENTOPS_DB
+      schema: TELCO
+      table: SUBSCRIPTIONS
+    primary_key:
+      columns:
+        - SUB_ID
+    dimensions:
+      - name: CHURN_FLG
+        expr: CHURN_FLG
+        data_type: BOOLEAN
+        access_modifier: public_access
+      - name: CHURN_RSN
+        expr: CHURN_RSN
+        data_type: VARCHAR(16777216)
+        access_modifier: public_access
+      - name: CUST_ID
+        expr: CUST_ID
+        data_type: "NUMBER(38,0)"
+        access_modifier: public_access
+      - name: PLAN_ID
+        expr: PLAN_ID
+        data_type: "NUMBER(38,0)"
+        access_modifier: public_access
+      - name: SUB_ID
+        expr: SUB_ID
+        data_type: "NUMBER(38,0)"
+        access_modifier: public_access
+    time_dimensions:
+      - name: END_DT
+        expr: END_DT
+        data_type: DATE
+        access_modifier: public_access
+      - name: START_DT
+        expr: START_DT
+        data_type: DATE
+        access_modifier: public_access
+  - name: SUPPORT_TICKETS
+    base_table:
+      database: AGENTOPS_DB
+      schema: TELCO
+      table: SUPPORT_TICKETS
+    primary_key:
+      columns:
+        - TKT_ID
+    dimensions:
+      - name: CAT
+        expr: CAT
+        data_type: VARCHAR(16777216)
+        access_modifier: public_access
+      - name: CUST_ID
+        expr: CUST_ID
+        data_type: "NUMBER(38,0)"
+        access_modifier: public_access
+      - name: TKT_ID
+        expr: TKT_ID
+        data_type: "NUMBER(38,0)"
+        access_modifier: public_access
+    facts:
+      - name: CSAT
+        expr: CSAT
+        data_type: "NUMBER(38,0)"
+        access_modifier: public_access
+      - name: RES_HRS
+        expr: RES_HRS
+        data_type: "NUMBER(8,1)"
+        access_modifier: public_access
+    time_dimensions:
+      - name: OPEN_TS
+        expr: OPEN_TS
+        data_type: TIMESTAMP_NTZ(9)
+        access_modifier: public_access
+relationships:
+  - name: BILLING_TO_SUBSCRIPTIONS
+    left_table: BILLING
+    right_table: SUBSCRIPTIONS
+    relationship_columns:
+      - left_column: SUB_ID
+        right_column: SUB_ID
+  - name: SUBSCRIPTIONS_TO_CUSTOMERS
+    left_table: SUBSCRIPTIONS
+    right_table: CUSTOMERS
+    relationship_columns:
+      - left_column: CUST_ID
+        right_column: CUST_ID
+  - name: SUBSCRIPTIONS_TO_PLANS
+    left_table: SUBSCRIPTIONS
+    right_table: PLANS
+    relationship_columns:
+      - left_column: PLAN_ID
+        right_column: PLAN_ID
+  - name: SUPPORT_TICKETS_TO_CUSTOMERS
+    left_table: SUPPORT_TICKETS
+    right_table: CUSTOMERS
+    relationship_columns:
+      - left_column: CUST_ID
+        right_column: CUST_ID
+verified_queries:
+  - name: CUSTOMERS_BY_SEG_CD
+    sql: "SELECT SEG_CD, COUNT(CUST_ID) AS CUSTOMER_COUNT FROM __CUSTOMERS GROUP BY SEG_CD"
+    question: How many customers are there by SEG_CD?
+    use_as_onboarding_question: false
+  - name: TOTAL_AMT_NET_BY_BILL_MO
+    sql: "SELECT BILL_MO, SUM(AMT_NET) AS TOTAL_AMT_NET FROM __BILLING GROUP BY BILL_MO ORDER BY BILL_MO"
+    question: What is the total AMT_NET by BILL_MO?
+    use_as_onboarding_question: false

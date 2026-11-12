@@ -1,0 +1,64 @@
+=== HOW SEMANTIC VIEWS ARE BUILT IN THIS DEMO ===
+There is ONE semantic view file: cortex_project/TELCO_REVENUE_SV.sv.yaml, with two deploy targets
+(Deploy changes button, defined in cortex_project/cortex-project.yaml):
+  dev  -> AGENTOPS_DB.SEMANTIC_VIEW_DEV.TELCO_REVENUE_SV  deploy every change here and eval it
+  prod -> AGENTOPS_DB.TELCO.TELCO_REVENUE_SV       the agent uses this; promote only after dev eval improves
+Deploy overwrites the target object (no built-in history), so prod keeps the last good version
+until you promote deliberately. Each step is a version label: v1 baseline -> v2 best practice ->
+v3 AI-tuned -> v4 drift fix. Every eval run records which version and target it scored.
+
+!! BEFORE YOU START: set the Workspace role to AGENTOPS_DEMO_ROLE and the warehouse to AGENTOPS_WH
+!! (role/warehouse picker at the top of the workspace). Deploy runs as the Workspace's primary role;
+!! any other role fails with "must have CREATE SEMANTIC VIEW granted on SCHEMA AGENTOPS_DB.TELCO".
+
+=== STEP 1a: BASELINE (version 1, intentionally minimal) ===
+Paste into CoCo:
+
+Use role AGENTOPS_DEMO_ROLE and warehouse AGENTOPS_WH.
+Build a semantic view in this workspace named TELCO_REVENUE_SV (target AGENTOPS_DB.TELCO)
+over the tables in AGENTOPS_DB.TELCO: PLANS, CUSTOMERS, SUBSCRIPTIONS, BILLING, NETWORK_EVENTS, SUPPORT_TICKETS.
+Save it as cortex_project/TELCO_REVENUE_SV.sv.yaml and open it in the editor.
+Keep it MINIMAL on purpose: only tables, primary keys, relationships, and the raw columns as-is
+as dimensions/facts. No descriptions, no synonyms, no metrics, no custom instructions,
+no AI-generated enrichment. This is our baseline.
+Add exactly 2 simple verified queries (VQRs) using the raw column names, because Semantic Studio
+evaluations need at least one VQR:
+  1. "How many customers are there by SEG_CD?" -> count of CUSTOMERS grouped by SEG_CD
+  2. "What is the total AMT_NET by BILL_MO?"   -> SUM(BILLING.AMT_NET) grouped by BILL_MO
+Keep them literal: no decoding of codes, and no definition of "revenue", ARPU or churn
+(those gaps are what the eval should expose).
+Validate the YAML and the 2 VQRs. Do NOT deploy it yourself; I will deploy it with Deploy changes.
+
+>> Presenter: Deploy changes -> dev AND prod (baseline starts in both). Then run P2 with VERSION_LABEL='v1_baseline'.
+You can do a GIT push of this version
+
+=== STEP 1b: BEST PRACTICES (version 2) ===
+Paste into CoCo (after the baseline eval):
+
+Edit the workspace file cortex_project/TELCO_REVENUE_SV.sv.yaml to follow semantic view best practices:
+1. Business-friendly names and a clear description for every table, dimension, fact and metric.
+2. Decode cryptic codes in descriptions and sample values:
+   SEG_CD C/S/E = Consumer/SMB/Enterprise; RGN_CD NE/SE/MW/SW/W = Northeast/Southeast/Midwest/Southwest/West;
+   STS_CD A/S/X = Active/Suspended/Churned; PLAN_TYP_CD PRE/POST/5GU/FBR = Prepaid/Postpaid/5G Unlimited/Fiber;
+   PAY_STS P/L/W = Paid/Late/Written off.
+3. Synonyms (e.g. revenue -> "sales, billings, net revenue"; customer segment -> "customer type, tier").
+4. Explicit metrics with agreed definitions:
+   - NET_REVENUE = SUM(BILLING.AMT_NET)  (this is THE definition of "revenue")
+   - GROSS_REVENUE = SUM(BILLING.AMT_GROSS)
+   - DISCOUNTS = SUM(BILLING.DISC_AMT)
+   - ARPU = NET_REVENUE / COUNT(DISTINCT customer) for the period
+   - MRR = SUM(BILLING.RECUR_AMT)
+   - CHURN_RATE = churned subscriptions / total subscriptions
+   - OUTAGE_MINUTES = SUM(NETWORK_EVENTS.DUR_MIN) where EVT_TYP='OUTAGE'
+   - AVG_CSAT = AVG(SUPPORT_TICKETS.CSAT)
+5. Time dimensions: BILL_MO (month grain), SIGNUP_DT, EVT_TS, OPEN_TS.
+6. Relationships: BILLING->SUBSCRIPTIONS->PLANS, SUBSCRIPTIONS->CUSTOMERS, SUPPORT_TICKETS->CUSTOMERS.
+   Add a way to analyze NETWORK_EVENTS by region next to revenue (e.g. a REGIONS logical table).
+7. Add 5 verified queries (VQRs) for common questions: net revenue by month, ARPU by segment,
+   revenue by plan type, churn rate by region, outage minutes by region.
+8. Add a custom instruction: "Revenue always means net revenue unless the user says gross.
+   'Last quarter' / 'last month' are relative to the latest BILL_MO in the data."
+Validate the YAML (including VQRs) and summarize what changed. Do NOT deploy; I will deploy it.
+
+>> Presenter: Deploy changes -> dev. Re-run P2 on dev with VERSION_LABEL='v2_best_practice'.
+>> If accuracy beats prod's score: Deploy changes -> prod (promotion).

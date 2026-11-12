@@ -1,1 +1,0 @@
-#Agent Ops in Snowflake

@@ -1,0 +1,14 @@
+=== STEP 5: Evaluate the agent ===
+Prereq: AGENTOPS_DB.TELCO.EVAL_AGENT_INPUT exists (from eval/eval_questions.sql).
+Paste into CoCo:
+
+Run a Cortex Agent evaluation of AGENTOPS_DB.TELCO.TELCO_REVENUE_AGENT using the dataset table
+AGENTOPS_DB.TELCO.EVAL_AGENT_INPUT (INPUT_QUERY, GROUND_TRUTH).
+Metrics: answer correctness, logical consistency, and tool selection accuracy
+(expected tool = telco_revenue_analyst for all in-scope questions, no tool for out-of-scope).
+Add a custom metric "refusal_correctness": did the agent correctly decline out-of-scope or destructive requests?
+Name the run TELCO_AGENT_BASELINE. When it finishes:
+- show per-metric scores and the 5 worst records with their traces explained
+- insert the summary into AGENTOPS_DB.TELCO.EVAL_SCOREBOARD (TARGET_TYPE='AGENT', SCENARIO='baseline',
+  TARGET_VERSION = the agent's current version)
+- then COMMIT the agent's live version with comment 'v1 baseline - eval passed' and show SHOW VERSIONS IN AGENT.

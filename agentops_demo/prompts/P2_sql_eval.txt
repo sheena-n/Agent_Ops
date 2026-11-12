@@ -1,0 +1,19 @@
+=== STEP 2: SQL EVAL of the semantic view (run after each deploy) ===
+Prereq: run eval/eval_questions.sql once. Set VERSION_LABEL to the version you just deployed:
+  v1_baseline | v2_best_practice | v3_ai_tuned | v4_drift_fix
+Paste into CoCo:
+
+Use role AGENTOPS_DEMO_ROLE and warehouse AGENTOPS_WH.
+Run a SQL accuracy evaluation of the DEV semantic view AGENTOPS_DB.TELCO.TELCO_REVENUE_SV,
+VERSION_LABEL = 'v1_baseline', using the golden set in AGENTOPS_DB.TELCO.EVAL_GOLDEN_QUESTIONS
+(skip rows where GOLD_SQL is null). For each question:
+  1. Ask Cortex Analyst the QUESTION against the semantic view and capture the generated SQL.
+  2. Execute the generated SQL and capture the result as JSON.
+  3. Compare it to EXPECTED_ANSWER. Treat it as correct if the numeric values match within 1%
+     (ignore column names, ordering and formatting). Use AI_COMPLETE as a judge when the
+     shapes differ, and return {is_correct, reason}.
+  4. Insert one row per question into AGENTOPS_DB.TELCO.EVAL_SV_RESULTS with
+     RUN_ID = 'SV_' || VERSION_LABEL and SV_NAME = 'TELCO_REVENUE_SV'.
+Then insert the overall accuracy into AGENTOPS_DB.TELCO.EVAL_SCOREBOARD
+(TARGET_TYPE='SEMANTIC_VIEW', TARGET_NAME='TELCO_REVENUE_SV', TARGET_VERSION=VERSION_LABEL, SCENARIO=VERSION_LABEL), show the failures,
+and compare accuracy (by DIFFICULTY) with every earlier version in the scoreboard.

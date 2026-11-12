@@ -1,0 +1,17 @@
+=== STEP 3: Use AI to improve the semantic view (hill-climbing loop -> version 3) ===
+Paste into CoCo:
+
+Look at the failed rows in AGENTOPS_DB.TELCO.EVAL_SV_RESULTS for RUN_ID='SV_v2_best_practice'.
+1. Use AI_CLASSIFY (or AI_COMPLETE) to tag each failure with a FAILURE_CATEGORY from:
+   [wrong_metric_definition, wrong_filter_or_code, wrong_join, wrong_time_grain,
+    ambiguous_term, relative_date, other]. Update the FAILURE_CATEGORY and JUDGE_REASON columns.
+2. Summarize the failures by category and propose specific fixes to the semantic view:
+   new or changed synonyms, metric definitions, sample values, custom instructions, and verified queries.
+   DO NOT add a verified query that is a verbatim copy of an eval question (that would leak the
+   eval). Write generalized VQRs instead, and keep a holdout of 5 questions that we never tune on.
+3. Apply the fixes by editing the workspace file cortex_project/TELCO_REVENUE_SV.sv.yaml,
+   validate it, and show me what changed. Do NOT deploy; I will deploy it.
+
+>> Presenter: Deploy changes -> dev. Re-run P2 with VERSION_LABEL='v3_ai_tuned'; promote to prod if it improves
+   and ask CoCo to show v1 -> v2 -> v3 accuracy, plus holdout accuracy separately.
+   If accuracy is below 90%, repeat this step (v3.1).

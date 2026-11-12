@@ -1,0 +1,7 @@
+version: 1
+artifacts:
+  - path: TELCO_REVENUE_SV.sv.yaml
+    type: semantic_view
+    targets:
+      DEV:
+        object: AGENTOPS_DB.SEMANTIC_VIEWS_DEV.TELCO_REVENUE_SV
